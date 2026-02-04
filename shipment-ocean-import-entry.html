@@ -1,0 +1,828 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ocean Import MB/L Query - GoFreight API</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/water.css@2/out/water.css"
+    />
+    <style>
+      .info-card {
+        margin-bottom: 1rem;
+      }
+      .info-card table {
+        width: 100%;
+      }
+      .info-card td:first-child {
+        font-weight: bold;
+        width: 200px;
+        white-space: nowrap;
+      }
+      .no-data {
+        color: #888;
+        font-style: italic;
+      }
+      .data-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .data-table th,
+      .data-table td {
+        border: 1px solid #ccc;
+        padding: 0.5rem;
+        text-align: left;
+      }
+      .data-table th {
+        background-color: #f5f5f5;
+      }
+      .error-message {
+        color: #c00;
+        padding: 1rem;
+        border: 1px solid #c00;
+        border-radius: 4px;
+        margin: 1rem 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Ocean Import MB/L Query</h1>
+
+    <button id="showConfigBtn" onclick="showApiConfig()" style="display: none">
+      ⚙️ Config
+    </button>
+
+    <!-- API Configuration Section -->
+    <fieldset id="apiConfigSection" style="display: none">
+      <legend>API Configuration</legend>
+      <table>
+        <tr>
+          <td>API Base URL:</td>
+          <td>
+            <input
+              type="text"
+              id="apiBase"
+              value="https://api.core.gofreight.co"
+              size="40"
+            />
+          </td>
+        </tr>
+        <tr>
+          <td>X-GATEWAY-TOKEN:</td>
+          <td>
+            <input
+              type="text"
+              id="token"
+              placeholder="Enter your token"
+              size="40"
+            />
+          </td>
+        </tr>
+        <tr>
+          <td>Use Proxy:</td>
+          <td>
+            <input type="checkbox" id="useProxy" checked /> Via Scalar Proxy
+            (bypass CORS)
+          </td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>
+            <button onclick="testConnection()">Test Connection</button>
+          </td>
+        </tr>
+      </table>
+      <div id="configStatus"></div>
+    </fieldset>
+
+    <br />
+
+    <!-- Query Info -->
+    <fieldset>
+      <legend>Query</legend>
+      <table>
+        <tr>
+          <td><strong>MB/L Reference:</strong></td>
+          <td id="mblRefDisplay">-</td>
+          <td>
+            <button onclick="fetchMblData()">🔄 Refresh</button>
+          </td>
+        </tr>
+      </table>
+    </fieldset>
+
+    <!-- Results Section -->
+    <div id="resultsSection" style="display: none">
+      <!-- Basic Info -->
+      <fieldset class="info-card">
+        <legend>基本資訊</legend>
+        <table>
+          <tr>
+            <td>Ref:</td>
+            <td id="field_ref">-</td>
+          </tr>
+          <tr>
+            <td>MB/L No:</td>
+            <td id="field_mbl_no">-</td>
+          </tr>
+          <tr>
+            <td>Transportation Mode:</td>
+            <td id="field_transportation_mode">-</td>
+          </tr>
+          <tr>
+            <td>Office:</td>
+            <td id="field_office">-</td>
+          </tr>
+          <tr>
+            <td>Post Date:</td>
+            <td id="field_post_date">-</td>
+          </tr>
+        </table>
+      </fieldset>
+
+      <!-- Transport Mode Info -->
+      <fieldset class="info-card">
+        <legend>運輸模式</legend>
+        <table>
+          <tr>
+            <td>Ship Mode:</td>
+            <td id="field_ship_mode">-</td>
+          </tr>
+          <tr>
+            <td>Service Term From:</td>
+            <td id="field_service_term_from">-</td>
+          </tr>
+          <tr>
+            <td>Service Term To:</td>
+            <td id="field_service_term_to">-</td>
+          </tr>
+        </table>
+      </fieldset>
+
+      <!-- Time Info -->
+      <fieldset class="info-card">
+        <legend>時間資訊</legend>
+        <table>
+          <tr>
+            <td>Estimated Departure Date:</td>
+            <td id="field_estimated_departure_date">-</td>
+          </tr>
+          <tr>
+            <td>Actual Departure Date:</td>
+            <td id="field_actual_departure_date">-</td>
+          </tr>
+          <tr>
+            <td>Estimated Arrival Date:</td>
+            <td id="field_estimated_arrival_date">-</td>
+          </tr>
+          <tr>
+            <td>Actual Arrival Date:</td>
+            <td id="field_actual_arrival_date">-</td>
+          </tr>
+          <tr>
+            <td>Estimated Time of Berth:</td>
+            <td id="field_estimated_time_of_berth">-</td>
+          </tr>
+          <tr>
+            <td>Actual Time of Berth:</td>
+            <td id="field_actual_time_of_berth">-</td>
+          </tr>
+          <tr>
+            <td>Final Destination Date:</td>
+            <td id="field_final_destination_date">-</td>
+          </tr>
+          <tr>
+            <td>Place of Delivery ETA:</td>
+            <td id="field_place_of_delivery_eta">-</td>
+          </tr>
+        </table>
+      </fieldset>
+
+      <!-- Voyage Info -->
+      <fieldset class="info-card">
+        <legend>航程資訊</legend>
+        <table>
+          <tr>
+            <td>Vessel Name:</td>
+            <td id="field_vessel_name">-</td>
+          </tr>
+          <tr>
+            <td>Voyage:</td>
+            <td id="field_voyage">-</td>
+          </tr>
+        </table>
+      </fieldset>
+
+      <!-- Port Info -->
+      <fieldset class="info-card">
+        <legend>港口資訊</legend>
+        <table>
+          <tr>
+            <td>Port of Loading:</td>
+            <td id="field_port_of_loading">-</td>
+          </tr>
+          <tr>
+            <td>Port of Discharge:</td>
+            <td id="field_port_of_discharge">-</td>
+          </tr>
+          <tr>
+            <td>Place of Receipt:</td>
+            <td id="field_place_of_receipt">-</td>
+          </tr>
+          <tr>
+            <td>Place of Delivery:</td>
+            <td id="field_place_of_delivery">-</td>
+          </tr>
+          <tr>
+            <td>Final Destination:</td>
+            <td id="field_final_destination">-</td>
+          </tr>
+        </table>
+      </fieldset>
+
+      <!-- Related Parties -->
+      <fieldset class="info-card">
+        <legend>相關方</legend>
+        <table>
+          <tr>
+            <td>Operator:</td>
+            <td id="field_operator">-</td>
+          </tr>
+          <tr>
+            <td>Carrier:</td>
+            <td id="field_carrier">-</td>
+          </tr>
+          <tr>
+            <td>Oversea Agent:</td>
+            <td id="field_oversea_agent">-</td>
+          </tr>
+          <tr>
+            <td>Container Yard:</td>
+            <td id="field_container_yard">-</td>
+          </tr>
+        </table>
+      </fieldset>
+
+      <!-- Cargo Info -->
+      <fieldset class="info-card">
+        <legend>貨物資訊</legend>
+        <table>
+          <tr>
+            <td>Package Unit:</td>
+            <td id="field_package_unit">-</td>
+          </tr>
+          <tr>
+            <td>Weight Unit:</td>
+            <td id="field_weight_unit">-</td>
+          </tr>
+          <tr>
+            <td>Measurement Unit:</td>
+            <td id="field_measurement_unit">-</td>
+          </tr>
+          <tr>
+            <td>Mark:</td>
+            <td id="field_mark">-</td>
+          </tr>
+          <tr>
+            <td>Description:</td>
+            <td id="field_description">-</td>
+          </tr>
+        </table>
+      </fieldset>
+
+      <!-- HB/L List -->
+      <fieldset class="info-card">
+        <legend>HB/L 清單</legend>
+        <div id="hblListContainer">
+          <p class="no-data">無資料</p>
+        </div>
+      </fieldset>
+
+      <!-- Container List -->
+      <fieldset class="info-card">
+        <legend>貨櫃清單</legend>
+        <div id="containerListContainer">
+          <p class="no-data">無資料</p>
+        </div>
+      </fieldset>
+
+      <!-- Direct Master Info -->
+      <fieldset class="info-card">
+        <legend>Direct Master</legend>
+        <div id="directMasterContainer">
+          <p class="no-data">無資料</p>
+        </div>
+      </fieldset>
+    </div>
+
+    <!-- Error/Status Messages -->
+    <pre id="errorLog"></pre>
+
+    <script>
+      const SCALAR_PROXY = "https://proxy.scalar.com";
+      let mblRef = null;
+
+      /**
+       * Show API Configuration section
+       */
+      function showApiConfig() {
+        document.getElementById("apiConfigSection").style.display = "";
+        document.getElementById("showConfigBtn").style.display = "none";
+      }
+
+      /**
+       * Hide API Configuration section
+       */
+      function hideApiConfig() {
+        document.getElementById("apiConfigSection").style.display = "none";
+        document.getElementById("showConfigBtn").style.display = "";
+      }
+
+      /**
+       * Save config to localStorage
+       */
+      function saveConfig() {
+        const config = {
+          apiBase: document.getElementById("apiBase").value,
+          token: document.getElementById("token").value,
+          useProxy: document.getElementById("useProxy").checked,
+        };
+        localStorage.setItem("gf_api_config", JSON.stringify(config));
+      }
+
+      /**
+       * Load config from localStorage
+       */
+      function loadConfig() {
+        try {
+          const saved = localStorage.getItem("gf_api_config");
+          if (saved) {
+            const config = JSON.parse(saved);
+            document.getElementById("apiBase").value =
+              config.apiBase || "https://api.core.gofreight.co";
+            document.getElementById("token").value = config.token || "";
+            const proxyCheckbox = document.getElementById("useProxy");
+            if (proxyCheckbox) {
+              proxyCheckbox.checked = config.useProxy !== false;
+            }
+          }
+        } catch (error) {
+          console.warn("Failed to load config from localStorage:", error);
+          localStorage.removeItem("gf_api_config");
+        }
+      }
+
+      /**
+       * Get request headers
+       * @returns {Object} Headers object with token and content type
+       */
+      function getHeaders() {
+        return {
+          "X-GATEWAY-TOKEN": document.getElementById("token").value,
+          "Content-Type": "application/json",
+        };
+      }
+
+      /**
+       * Get API base URL (without trailing slash)
+       * @returns {string} API base URL
+       */
+      function getApiBase() {
+        return document.getElementById("apiBase").value.replace(/\/$/, "");
+      }
+
+      /**
+       * Build URL (optionally through Proxy)
+       * @param {string} path - API path
+       * @returns {string} Full URL
+       */
+      function buildUrl(path) {
+        const baseUrl = getApiBase();
+        const fullUrl = `${baseUrl}${path}`;
+
+        const proxyCheckbox = document.getElementById("useProxy");
+        if (proxyCheckbox && proxyCheckbox.checked) {
+          return `${SCALAR_PROXY}/?scalar_url=${encodeURIComponent(fullUrl)}`;
+        }
+        return fullUrl;
+      }
+
+      /**
+       * Test API connection
+       */
+      async function testConnection() {
+        const statusEl = document.getElementById("configStatus");
+        statusEl.textContent = "⏳ Testing...";
+
+        try {
+          const url = buildUrl("/api/v1/trade-partners/?limit=1");
+          const response = await fetch(url, { headers: getHeaders() });
+
+          if (response.ok) {
+            statusEl.textContent = "✅ Connection successful! Token is valid";
+            saveConfig();
+            hideApiConfig();
+            return true;
+          } else if (response.status === 401) {
+            statusEl.textContent =
+              "❌ 401 Unauthorized - Token invalid or revoked";
+            showApiConfig();
+            return false;
+          } else {
+            const text = await response.text();
+            statusEl.textContent = `❌ HTTP ${response.status}`;
+            document.getElementById("errorLog").textContent = text;
+            showApiConfig();
+            return false;
+          }
+        } catch (error) {
+          statusEl.textContent = `❌ Network error: ${error.message}`;
+          document.getElementById("errorLog").textContent = error.toString();
+          showApiConfig();
+          return false;
+        }
+      }
+
+      /**
+       * Display a value or placeholder for empty values
+       * @param {*} value - Value to display
+       * @returns {string} Display string
+       */
+      function displayValue(value) {
+        if (value === null || value === undefined || value === "") {
+          return '<span class="no-data">-</span>';
+        }
+        if (typeof value === "object") {
+          return escapeHtml(JSON.stringify(value));
+        }
+        return escapeHtml(String(value));
+      }
+
+      /**
+       * Escape HTML special characters
+       * @param {string} text - Text to escape
+       * @returns {string} Escaped text
+       */
+      function escapeHtml(text) {
+        const div = document.createElement("div");
+        div.textContent = text;
+        return div.innerHTML;
+      }
+
+      /**
+       * Format a trade partner object for display
+       * @param {Object} partner - Trade partner object
+       * @returns {string} Formatted string
+       */
+      function formatTradePartner(partner) {
+        if (!partner) return '<span class="no-data">-</span>';
+        const parts = [];
+        if (partner.name) parts.push(partner.name);
+        if (partner.ref) parts.push(`(${partner.ref})`);
+        return parts.length > 0
+          ? escapeHtml(parts.join(" "))
+          : '<span class="no-data">-</span>';
+      }
+
+      /**
+       * Format a port object for display
+       * @param {Object} port - Port object
+       * @returns {string} Formatted string
+       */
+      function formatPort(port) {
+        if (!port) return '<span class="no-data">-</span>';
+        const parts = [];
+        if (port.name) parts.push(port.name);
+        if (port.code) parts.push(`(${port.code})`);
+        return parts.length > 0
+          ? escapeHtml(parts.join(" "))
+          : '<span class="no-data">-</span>';
+      }
+
+      /**
+       * Render HB/L list table
+       * @param {Array} hblList - Array of HB/L objects
+       */
+      function renderHblList(hblList) {
+        const container = document.getElementById("hblListContainer");
+        if (!hblList || hblList.length === 0) {
+          container.innerHTML = '<p class="no-data">無資料</p>';
+          return;
+        }
+
+        let html = `
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Ref</th>
+                <th>HB/L No</th>
+                <th>Shipper</th>
+                <th>Consignee</th>
+                <th>Notify</th>
+              </tr>
+            </thead>
+            <tbody>
+        `;
+
+        for (const hbl of hblList) {
+          html += `
+            <tr>
+              <td>${displayValue(hbl.ref)}</td>
+              <td>${displayValue(hbl.hbl_no)}</td>
+              <td>${formatTradePartner(hbl.shipper)}</td>
+              <td>${formatTradePartner(hbl.consignee)}</td>
+              <td>${formatTradePartner(hbl.notify)}</td>
+            </tr>
+          `;
+        }
+
+        html += "</tbody></table>";
+        container.innerHTML = html;
+      }
+
+      /**
+       * Render container list table
+       * @param {Array} containerList - Array of container objects
+       */
+      function renderContainerList(containerList) {
+        const container = document.getElementById("containerListContainer");
+        if (!containerList || containerList.length === 0) {
+          container.innerHTML = '<p class="no-data">無資料</p>';
+          return;
+        }
+
+        let html = `
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Container No</th>
+                <th>Seal No</th>
+                <th>Size/Type</th>
+                <th>Package</th>
+                <th>Weight</th>
+                <th>Measurement</th>
+              </tr>
+            </thead>
+            <tbody>
+        `;
+
+        for (const cntr of containerList) {
+          html += `
+            <tr>
+              <td>${displayValue(cntr.container_no)}</td>
+              <td>${displayValue(cntr.seal_no)}</td>
+              <td>${displayValue(cntr.size_type)}</td>
+              <td>${displayValue(cntr.package_qty)}</td>
+              <td>${displayValue(cntr.weight)}</td>
+              <td>${displayValue(cntr.measurement)}</td>
+            </tr>
+          `;
+        }
+
+        html += "</tbody></table>";
+        container.innerHTML = html;
+      }
+
+      /**
+       * Render Direct Master info
+       * @param {Object} directMaster - Direct master object
+       */
+      function renderDirectMaster(directMaster) {
+        const container = document.getElementById("directMasterContainer");
+        if (!directMaster || Object.keys(directMaster).length === 0) {
+          container.innerHTML = '<p class="no-data">無資料</p>';
+          return;
+        }
+
+        let html = `
+          <table>
+            <tr>
+              <td style="font-weight: bold; width: 200px;">Shipper:</td>
+              <td>${formatTradePartner(directMaster.shipper)}</td>
+            </tr>
+            <tr>
+              <td style="font-weight: bold;">Consignee:</td>
+              <td>${formatTradePartner(directMaster.consignee)}</td>
+            </tr>
+            <tr>
+              <td style="font-weight: bold;">Notify:</td>
+              <td>${formatTradePartner(directMaster.notify)}</td>
+            </tr>
+            <tr>
+              <td style="font-weight: bold;">Mark:</td>
+              <td>${displayValue(directMaster.mark)}</td>
+            </tr>
+            <tr>
+              <td style="font-weight: bold;">Description:</td>
+              <td>${displayValue(directMaster.description)}</td>
+            </tr>
+          </table>
+        `;
+        container.innerHTML = html;
+      }
+
+      /**
+       * Populate all data fields
+       * @param {Object} data - MB/L data from API
+       */
+      function populateData(data) {
+        // Basic Info
+        document.getElementById("field_ref").innerHTML = displayValue(data.ref);
+        document.getElementById("field_mbl_no").innerHTML = displayValue(
+          data.mbl_no,
+        );
+        document.getElementById("field_transportation_mode").innerHTML =
+          displayValue(data.transportation_mode);
+        document.getElementById("field_office").innerHTML = displayValue(
+          data.office,
+        );
+        document.getElementById("field_post_date").innerHTML = displayValue(
+          data.post_date,
+        );
+
+        // Transport Mode Info
+        document.getElementById("field_ship_mode").innerHTML = displayValue(
+          data.ship_mode,
+        );
+        document.getElementById("field_service_term_from").innerHTML =
+          displayValue(data.service_term_from);
+        document.getElementById("field_service_term_to").innerHTML =
+          displayValue(data.service_term_to);
+
+        // Time Info
+        document.getElementById("field_estimated_departure_date").innerHTML =
+          displayValue(data.estimated_departure_date);
+        document.getElementById("field_actual_departure_date").innerHTML =
+          displayValue(data.actual_departure_date);
+        document.getElementById("field_estimated_arrival_date").innerHTML =
+          displayValue(data.estimated_arrival_date);
+        document.getElementById("field_actual_arrival_date").innerHTML =
+          displayValue(data.actual_arrival_date);
+        document.getElementById("field_estimated_time_of_berth").innerHTML =
+          displayValue(data.estimated_time_of_berth);
+        document.getElementById("field_actual_time_of_berth").innerHTML =
+          displayValue(data.actual_time_of_berth);
+        document.getElementById("field_final_destination_date").innerHTML =
+          displayValue(data.final_destination_date);
+        document.getElementById("field_place_of_delivery_eta").innerHTML =
+          displayValue(data.place_of_delivery_eta);
+
+        // Voyage Info
+        document.getElementById("field_vessel_name").innerHTML = displayValue(
+          data.vessel_name,
+        );
+        document.getElementById("field_voyage").innerHTML = displayValue(
+          data.voyage,
+        );
+
+        // Port Info
+        document.getElementById("field_port_of_loading").innerHTML = formatPort(
+          data.port_of_loading,
+        );
+        document.getElementById("field_port_of_discharge").innerHTML =
+          formatPort(data.port_of_discharge);
+        document.getElementById("field_place_of_receipt").innerHTML = formatPort(
+          data.place_of_receipt,
+        );
+        document.getElementById("field_place_of_delivery").innerHTML =
+          formatPort(data.place_of_delivery);
+        document.getElementById("field_final_destination").innerHTML =
+          formatPort(data.final_destination);
+
+        // Related Parties
+        document.getElementById("field_operator").innerHTML = formatTradePartner(
+          data.operator,
+        );
+        document.getElementById("field_carrier").innerHTML = formatTradePartner(
+          data.carrier,
+        );
+        document.getElementById("field_oversea_agent").innerHTML =
+          formatTradePartner(data.oversea_agent);
+        document.getElementById("field_container_yard").innerHTML =
+          formatTradePartner(data.container_yard);
+
+        // Cargo Info
+        document.getElementById("field_package_unit").innerHTML = displayValue(
+          data.package_unit,
+        );
+        document.getElementById("field_weight_unit").innerHTML = displayValue(
+          data.weight_unit,
+        );
+        document.getElementById("field_measurement_unit").innerHTML =
+          displayValue(data.measurement_unit);
+        document.getElementById("field_mark").innerHTML = displayValue(
+          data.mark,
+        );
+        document.getElementById("field_description").innerHTML = displayValue(
+          data.description,
+        );
+
+        // HB/L List
+        renderHblList(data.hbl_list);
+
+        // Container List
+        renderContainerList(data.container_list);
+
+        // Direct Master Info (always show section)
+        renderDirectMaster(data.direct_master_info);
+      }
+
+      /**
+       * Fetch MB/L data from API
+       */
+      async function fetchMblData() {
+        if (!mblRef) {
+          document.getElementById("errorLog").textContent =
+            "❌ Error: No mbl_ref parameter provided in URL";
+          return;
+        }
+
+        const errorEl = document.getElementById("errorLog");
+        const resultsSection = document.getElementById("resultsSection");
+        const refreshBtn = document.querySelector(
+          'button[onclick="fetchMblData()"]',
+        );
+
+        // Disable refresh button during loading
+        if (refreshBtn) refreshBtn.disabled = true;
+        errorEl.textContent = "⏳ Loading...";
+        resultsSection.style.display = "none";
+
+        try {
+          const url = buildUrl(
+            `/api/v1/shipments/ocean-import/mbl/${encodeURIComponent(mblRef)}`,
+          );
+          const response = await fetch(url, { headers: getHeaders() });
+
+          if (response.ok) {
+            try {
+              const responseData = await response.json();
+              const data = responseData.data || responseData;
+              errorEl.textContent = "";
+              resultsSection.style.display = "";
+              populateData(data);
+            } catch (parseError) {
+              errorEl.textContent = `❌ Failed to parse response: ${parseError.message}`;
+            }
+          } else if (response.status === 401) {
+            errorEl.textContent =
+              "❌ 401 Unauthorized - Token invalid or revoked";
+            showApiConfig();
+          } else if (response.status === 404) {
+            errorEl.textContent = `❌ 404 Not Found - MB/L with ref "${mblRef}" not found`;
+          } else {
+            const text = await response.text();
+            errorEl.textContent = `❌ HTTP ${response.status}: ${text}`;
+          }
+        } catch (error) {
+          errorEl.textContent = `❌ Network error: ${error.message}`;
+        } finally {
+          // Re-enable refresh button
+          if (refreshBtn) refreshBtn.disabled = false;
+        }
+      }
+
+      /**
+       * Initialize page on load
+       */
+      async function initPage() {
+        loadConfig();
+
+        // Get mbl_ref from URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        mblRef = urlParams.get("mbl_ref");
+
+        // Display mbl_ref
+        const mblRefDisplay = document.getElementById("mblRefDisplay");
+        if (mblRef) {
+          mblRefDisplay.textContent = mblRef;
+        } else {
+          mblRefDisplay.innerHTML =
+            '<span class="no-data">未提供 mbl_ref 參數</span>';
+          document.getElementById("errorLog").textContent =
+            '❌ Error: Please provide mbl_ref parameter in URL (e.g., ?mbl_ref=YOUR_REF)';
+          showApiConfig();
+          return;
+        }
+
+        const token = document.getElementById("token").value;
+
+        if (!token) {
+          showApiConfig();
+          document.getElementById("configStatus").textContent =
+            "⚠️ Please configure your API token";
+          return;
+        }
+
+        // Test connection first
+        const isConnected = await testConnection();
+        if (isConnected && mblRef) {
+          await fetchMblData();
+        }
+      }
+
+      window.onload = initPage;
+    </script>
+  </body>
+</html>
