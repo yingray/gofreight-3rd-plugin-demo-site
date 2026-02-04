@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Trade Partners API Test</title>
+</head>
+<body>
+    <h1>Trade Partners API Test</h1>
+
+    <!-- Token Configuration Section -->
+    <fieldset>
+        <legend>API Configuration</legend>
+        <table>
+            <tr>
+                <td>API Base URL:</td>
+                <td><input type="text" id="apiBase" value="https://api.core.gofreight.co" size="40"></td>
+            </tr>
+            <tr>
+                <td>X-GATEWAY-TOKEN:</td>
+                <td><input type="text" id="token" placeholder="Enter your token" size="40"></td>
+            </tr>
+            <tr>
+                <td>Use Proxy:</td>
+                <td><input type="checkbox" id="useProxy" checked> Via Scalar Proxy (bypass CORS)</td>
+            </tr>
+            <tr>
+                <td></td>
+                <td>
+                    <button onclick="saveConfig()">Save Config</button>
+                    <button onclick="loadConfig()">Load Config</button>
+                    <button onclick="testConnection()">Test Connection</button>
+                </td>
+            </tr>
+        </table>
+        <div id="configStatus"></div>
+    </fieldset>
+
+    <br>
+
+    <!-- Query Controls -->
+    <fieldset>
+        <legend>Query Options</legend>
+        <table>
+            <tr>
+                <td>Items per page:</td>
+                <td>
+                    <select id="limit">
+                        <option value="10">10</option>
+                        <option value="20">20</option>
+                        <option value="50">50</option>
+                        <option value="100" selected>100</option>
+                    </select>
+                </td>
+                <td>Type filter:</td>
+                <td>
+                    <select id="typeFilter">
+                        <option value="">All</option>
+                        <option value="CS">CS - Customer</option>
+                        <option value="CN">CN - Consignee</option>
+                        <option value="VR">VR - Vendor</option>
+                        <option value="AG">AG - Agent</option>
+                        <option value="CR">CR - Carrier</option>
+                    </select>
+                </td>
+                <td>
+                    <button onclick="fetchTradePartners(1)">Search</button>
+                </td>
+            </tr>
+        </table>
+    </fieldset>
+
+    <br>
+
+    <!-- Results Section -->
+    <fieldset>
+        <legend>Trade Partners</legend>
+        <div id="meta"></div>
+        <div id="pagination"></div>
+        <table border="1" id="resultTable">
+            <thead>
+                <tr>
+                    <th>Ref</th>
+                    <th>Name</th>
+                    <th>Short Name</th>
+                    <th>Type</th>
+                    <th>Active</th>
+                    <th>Country</th>
+                    <th>City</th>
+                    <th>Phone</th>
+                </tr>
+            </thead>
+            <tbody id="resultBody">
+                <tr><td colspan="8">No query yet</td></tr>
+            </tbody>
+        </table>
+    </fieldset>
+
+    <!-- Error/Status Messages -->
+    <pre id="errorLog"></pre>
+
+    <script>
+        const SCALAR_PROXY = 'https://proxy.scalar.com';
+        let currentPage = 1;
+
+        // Save config to localStorage
+        function saveConfig() {
+            const config = {
+                apiBase: document.getElementById('apiBase').value,
+                token: document.getElementById('token').value,
+                useProxy: document.getElementById('useProxy').checked
+            };
+            localStorage.setItem('gf_api_config', JSON.stringify(config));
+            document.getElementById('configStatus').textContent = '✅ Config saved';
+        }
+
+        // Load config from localStorage
+        function loadConfig() {
+            const saved = localStorage.getItem('gf_api_config');
+            if (saved) {
+                const config = JSON.parse(saved);
+                document.getElementById('apiBase').value = config.apiBase || 'https://api.core.gofreight.co';
+                document.getElementById('token').value = config.token || '';
+                const proxyCheckbox = document.getElementById('useProxy');
+                if (proxyCheckbox) {
+                    proxyCheckbox.checked = config.useProxy !== false;
+                }
+                document.getElementById('configStatus').textContent = '✅ Config loaded';
+            } else {
+                document.getElementById('configStatus').textContent = '⚠️ No saved config found';
+            }
+        }
+
+        // Get headers
+        function getHeaders() {
+            return {
+                'X-GATEWAY-TOKEN': document.getElementById('token').value,
+                'Content-Type': 'application/json'
+            };
+        }
+
+        // Get API base URL
+        function getApiBase() {
+            return document.getElementById('apiBase').value.replace(/\/$/, '');
+        }
+
+        // Build URL (optionally through Proxy)
+        function buildUrl(path) {
+            const baseUrl = getApiBase();
+            const fullUrl = `${baseUrl}${path}`;
+
+            const proxyCheckbox = document.getElementById('useProxy');
+            if (proxyCheckbox && proxyCheckbox.checked) {
+                return `${SCALAR_PROXY}/?scalar_url=${encodeURIComponent(fullUrl)}`;
+            }
+            return fullUrl;
+        }
+
+        // Test connection
+        async function testConnection() {
+            const statusEl = document.getElementById('configStatus');
+            statusEl.textContent = '⏳ Testing...';
+
+            try {
+                const url = buildUrl('/api/v1/trade-partners/?limit=1');
+                const response = await fetch(url, { headers: getHeaders() });
+
+                if (response.ok) {
+                    statusEl.textContent = '✅ Connection successful! Token is valid';
+                } else if (response.status === 401) {
+                    statusEl.textContent = '❌ 401 Unauthorized - Token invalid or revoked';
+                } else {
+                    const text = await response.text();
+                    statusEl.textContent = `❌ HTTP ${response.status}`;
+                    document.getElementById('errorLog').textContent = text;
+                }
+            } catch (error) {
+                statusEl.textContent = `❌ Network error: ${error.message}`;
+                document.getElementById('errorLog').textContent = error.toString();
+            }
+        }
+
+        // Fetch Trade Partners
+        async function fetchTradePartners(page = 1) {
+            currentPage = page;
+            const limit = document.getElementById('limit').value;
+            const typeFilter = document.getElementById('typeFilter').value;
+            const tbody = document.getElementById('resultBody');
+            const metaEl = document.getElementById('meta');
+            const errorEl = document.getElementById('errorLog');
+
+            tbody.innerHTML = '<tr><td colspan="8">⏳ Loading...</td></tr>';
+            metaEl.textContent = '';
+            errorEl.textContent = '';
+
+            // Build URL
+            let path = `/api/v1/trade-partners/?page=${page}&limit=${limit}`;
+            if (typeFilter) {
+                path += `&type[]=${typeFilter}`;
+            }
+            const url = buildUrl(path);
+
+            try {
+                const response = await fetch(url, { headers: getHeaders() });
+                const data = await response.json();
+
+                if (!response.ok) {
+                    tbody.innerHTML = `<tr><td colspan="8">❌ Error: ${data.message || response.status}</td></tr>`;
+                    errorEl.textContent = JSON.stringify(data, null, 2);
+                    return;
+                }
+
+                // Display meta info
+                const meta = data.meta;
+                metaEl.textContent = `Total: ${meta.total} | Page ${meta.current_page} of ${meta.total_pages}`;
+
+                // Render pagination
+                renderPagination(meta.current_page, meta.total_pages);
+
+                // Render table
+                if (data.data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="8">No data</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = data.data.map(tp => `
+                    <tr>
+                        <td>${tp.ref || ''}</td>
+                        <td>${tp.name || ''}</td>
+                        <td>${tp.short_name || ''}</td>
+                        <td>${tp.type || ''}</td>
+                        <td>${tp.is_active ? '✓' : '✗'}</td>
+                        <td>${tp.address?.country_code || ''}</td>
+                        <td>${tp.address?.city_name || ''}</td>
+                        <td>${tp.address?.phone || ''}</td>
+                    </tr>
+                `).join('');
+
+            } catch (error) {
+                tbody.innerHTML = `<tr><td colspan="8">❌ Network error</td></tr>`;
+                errorEl.textContent = `Error: ${error.message}`;
+            }
+        }
+
+        // Render pagination buttons
+        function renderPagination(current, total) {
+            const el = document.getElementById('pagination');
+            if (total <= 1) {
+                el.innerHTML = '';
+                return;
+            }
+
+            let html = '';
+            if (current > 1) {
+                html += `<button onclick="fetchTradePartners(${current - 1})">◀ Previous</button> `;
+            }
+            html += `Page ${current} of ${total}`;
+            if (current < total) {
+                html += ` <button onclick="fetchTradePartners(${current + 1})">Next ▶</button>`;
+            }
+            el.innerHTML = html;
+        }
+
+        // Auto-load config on page load
+        window.onload = function() {
+            loadConfig();
+        };
+    </script>
+</body>
+</html>
